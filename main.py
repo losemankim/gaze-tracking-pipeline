@@ -697,11 +697,7 @@ def main(calibration_matrix_path: str, monitor_mm, monitor_pixels=None, model=No
                     #오래된 레이저포인터일수록 굵기가 작아집니다.
                     cv2.line(display, gaze_points[idx - 1], gaze_points[idx], (0, 0, 255), thickness)#레이저포인터를 그립니다.
                     #레이저포인터의 색은 빨간색입니다.
-                    # gaze_points를 저장합니다
-                    # file = open("gaze_points.txt", "w")
-                    # file.write(str(gaze_points))
-                    print(gaze_points)
-                     
+                
                     
                 if frame_idx % 2 == 0: # frame_idx가 2로 나누어 떨어지면
                     cv2.imshow(WINDOW_NAME, display)#레이저포인터를 보여줍니다.
