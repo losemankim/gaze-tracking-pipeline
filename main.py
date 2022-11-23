@@ -13,10 +13,10 @@ from model import Model
 from mpii_face_gaze_preprocessing import normalize_single_image
 from utils import get_camera_matrix, get_face_landmarks_in_ccs, gaze_2d_to_3d, ray_plane_intersection, plane_equation, get_monitor_dimensions, get_point_on_screen
 from visualization import Plot3DScene
-from webcam import WebcamSource
+from webcam import WebcamSource 
 
 # face model from https://github.com/google/mediapipe/blob/master/mediapipe/modules/face_geometry/data/canonical_face_model.obj
-face_model_all: np.ndarray = np.array([
+face_model_all: np.ndarray = np.array([ 
     [0.000000, -3.406404, 5.979507],
     [0.000000, -1.126865, 7.475604],
     [0.000000, -2.089024, 6.058267],
@@ -491,14 +491,26 @@ face_model_all *= np.array([1, -1, -1])  # fix axis
 face_model_all *= 10
 
 landmarks_ids = [33, 133, 362, 263, 61, 291, 1]  # reye, leye, mouth
+"""
+33,133은 우측 눈, 362,263은 좌측 눈, 61,291은 입술, 1은 코
+"""
 face_model = np.asarray([face_model_all[i] for i in landmarks_ids])
 
 WINDOW_NAME = 'laser pointer preview'
-
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
-def main(calibration_matrix_path: str, monitor_mm=None, monitor_pixels=None, model=None, visualize_preprocessing=False, visualize_laser_pointer=True, visualize_3d=False):
+def main(calibration_matrix_path: str, monitor_mm, monitor_pixels=None, model=None, visualize_preprocessing=False, visualize_laser_pointer=True, visualize_3d=False):
+    """
+    calibration_matrix_path = calibartion_matrix.yaml 경로
+    monitor_mm = 모니터 크기 (mm)
+    monitor_pixels = 모니터 해상도 (pixel)
+    model= p0.ckpt 모델 경로
+    visualize_preprocessing = 전처리 과정 시각화
+    visualize_laser_pointer = 레이저 포인터 시각화
+    visualize_3d = 3D 시각화 
+    """
+    
     # setup webcam
     source = WebcamSource(width=1280, height=720, fps=60, buffer_size=10)
     camera_matrix, dist_coefficients = get_camera_matrix(calibration_matrix_path)
@@ -511,6 +523,23 @@ def main(calibration_matrix_path: str, monitor_mm=None, monitor_pixels=None, mod
     print(f'Found default monitor of size {monitor_mm[0]}x{monitor_mm[1]}mm and {monitor_pixels[0]}x{monitor_pixels[1]}px.')
 
     # TODO load calibrated screen position
+    #plane은 모니터 평면을 나타내는 변수
+    """
+    np.eye(3)는 단위행렬을 의미합니다
+    np.asarray([0, 0, 0])은 원점을 의미합니다
+    plane_w는 모니터 평면의 너비를 의미합니다
+    plane_b는 모니터 평면의 높이를 의미합니다
+    fps_deque는 프레임을 저장하는 변수입니다
+    collections.deque는 양방향 큐를 의미합니다
+    
+    prev_frame_time은 이전 프레임의 시간을 저장하는 변수입니다 양방향 큐를 사용합니다.
+    smoothing_buffer는 이전 프레임의 위치를 저장하는 변수입니다 양방향 큐를 사용합니다.
+    rvec_buffer는 이전 프레임의 rvec를 저장하는 변수입니다 양방향 큐를 사용합니다.
+    tvec_buffer는 이전 프레임의 tvec를 저장하는 변수입니다 양방향 큐를 사용합니다.
+    gaze_vector_buffer는 이전 프레임의 gaze_vector를 저장하는 변수입니다 양방향 큐를 사용합니다.
+    rvec, tvec는 카메라의 위치를 나타내는 변수입니다 양방향 큐를 사용합니다.
+    gaze_points는 눈의 위치를 나타내는 변수입니다 양방향 큐를 사용합니다.
+    """
     plane = plane_equation(np.eye(3), np.asarray([[0], [0], [0]]))
     plane_w = plane[0:3]
     plane_b = plane[3]
@@ -526,25 +555,47 @@ def main(calibration_matrix_path: str, monitor_mm=None, monitor_pixels=None, mod
     gaze_points = collections.deque(maxlen=64)
 
     face_mesh = mp.solutions.face_mesh.FaceMesh(static_image_mode=False, max_num_faces=1)
-
+    """
+    media_pipe라이브러리를 사용하여 얼굴을 인식합니다.
+    transform은 얼굴을 인식한 후 얼굴을 정면으로 바꾸는 함수입니다.
+    A는 얼굴을 정면으로 바꾸는데 사용되는 변수입니다.
+    A.Compose는 얼굴을 정면으로 바꾸는 함수입니다.
+    Compose는 여러 함수를 하나로 묶어주는 함수입니다.
+    Normalize()는 이미지를 정규화하는 함수입니다.
+    ToTensorV2()는 이미지를 텐서로 바꾸는 함수입니다.
+    텐서는 다차원 배열을 의미합니다.
+    """
     transform = A.Compose([
         A.Normalize(),
         ToTensorV2()
     ])
-
+    #만약 visualize_laser_pointer가 True이면 레이저 포인터를 시각화합니다.
     if visualize_laser_pointer:
         cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_NORMAL)
         cv2.setWindowProperty(WINDOW_NAME, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
-
+    """
+    plot_3d_scene는 3차원 그래프를 그리는 함수입니다.
+    Plot3DScene은 3차원 그래프를 그리는 클래스입니다.  
+    enumerate는 반복문 사용 시 몇 번째 반복문인지 확인할 수 있습니다.
+    source는 웹캠을 의미합니다.
+    frame_idx는 프레임의 인덱스를 의미합니다.
+    frame는 프레임을 의미합니다.
+    height는 프레임의 높이를 의미합니다.
+    width는 프레임의 너비를 의미합니다.
+    results는 얼굴을 인식한 결과를 의미합니다.
+    """
     plot_3d_scene = Plot3DScene(face_model, monitor_mm[0], monitor_mm[1], 20) if visualize_3d else None
-
+    
     for frame_idx, frame in enumerate(source):
         height, width, _ = frame.shape
         image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
         image_rgb.flags.writeable = False
         results = face_mesh.process(image_rgb)
-
+        """
+        multi_face_landmarks는 얼굴의 랜드마크를 의미합니다.
+        만약 results.multi_face_landmarks가 있다면 얼굴을 인식한 것입니다.
+        """
         if results.multi_face_landmarks:
             # head pose estimation
             face_landmarks = np.asarray([[landmark.x * width, landmark.y * height] for landmark in results.multi_face_landmarks[0].landmark])
@@ -552,7 +603,14 @@ def main(calibration_matrix_path: str, monitor_mm=None, monitor_pixels=None, mod
             smoothing_buffer.append(face_landmarks)
             face_landmarks = np.asarray(smoothing_buffer).mean(axis=0)
 
+            """
+            solvePnPRansac를 사용하여 랜드마크를 통해 머리의 위치와 방향을 추정합니다.
+            solvePnP를 사용하여 랜드마크를 통해 머리의 위치와 방향을 추정합니다.
+            두개의 차이점은 solvePnPRansac는 랜드마크의 위치가 왜곡되었을 때 더 정확한 결과를 얻을 수 있습니다.
+            
+            """
             success, rvec, tvec, inliers = cv2.solvePnPRansac(face_model, face_landmarks, camera_matrix, dist_coefficients, rvec=rvec, tvec=tvec, useExtrinsicGuess=True, flags=cv2.SOLVEPNP_EPNP)  # Initial fit
+            #_는 루프 카운터를 사용하지 않음을 나타냄
             for _ in range(10):
                 success, rvec, tvec = cv2.solvePnP(face_model, face_landmarks, camera_matrix, dist_coefficients, rvec=rvec, tvec=tvec, useExtrinsicGuess=True, flags=cv2.SOLVEPNP_ITERATIVE)  # Second fit for higher accuracy
 
@@ -561,7 +619,16 @@ def main(calibration_matrix_path: str, monitor_mm=None, monitor_pixels=None, mod
             tvec_buffer.append(tvec)
             tvec = np.asarray(tvec_buffer).mean(axis=0)
 
-            # data preprocessing
+            # data preprocessing for 3d visualization and laser pointer control
+            """
+            get_face_landmarks_in_ccs는 랜드마크를 카메라 좌표계로 변환하는 함수입니다.
+            left_eye_center는 왼쪽 눈의 중심을 의미합니다.
+            right_eye_center는 오른쪽 눈의 중심을 의미합니다.
+            normalize_single_image는 이미지를 정규화하는 함수입니다.
+            img_warped_left_eye는 왼쪽 눈을 기준으로 이미지를 변환한 것을 의미합니다.
+            img_warped_right_eye는 오른쪽 눈을 기준으로 이미지를 변환한 것을 의미합니다.
+            img_warped_face는 얼굴을 기준으로 이미지를 변환한 것을 의미합니다.
+            """
             face_model_transformed, face_model_all_transformed = get_face_landmarks_in_ccs(camera_matrix, dist_coefficients, frame.shape, results, face_model, face_model_all, landmarks_ids)
             left_eye_center = 0.5 * (face_model_transformed[:, 2] + face_model_transformed[:, 3]).reshape((3, 1))  # center eye
             right_eye_center = 0.5 * (face_model_transformed[:, 0] + face_model_transformed[:, 1]).reshape((3, 1))  # center eye
@@ -570,18 +637,39 @@ def main(calibration_matrix_path: str, monitor_mm=None, monitor_pixels=None, mod
             img_warped_left_eye, _, _ = normalize_single_image(image_rgb, rvec, None, left_eye_center, camera_matrix)
             img_warped_right_eye, _, _ = normalize_single_image(image_rgb, rvec, None, right_eye_center, camera_matrix)
             img_warped_face, _, rotation_matrix = normalize_single_image(image_rgb, rvec, None, face_center, camera_matrix, is_eye=False)
-
+            #만약 visualize_preprocessing이 True이면 이미지를 보여줍니다.
             if visualize_preprocessing:
                 cv2.imshow('img_warped_left_eye', cv2.cvtColor(img_warped_left_eye, cv2.COLOR_RGB2BGR))
                 cv2.imshow('img_warped_right_eye', cv2.cvtColor(img_warped_right_eye, cv2.COLOR_RGB2BGR))
                 cv2.imshow('img_warped_face', cv2.cvtColor(img_warped_face, cv2.COLOR_RGB2BGR))
-
+            """
+            person_idx는 torch.tensor로서 눈의 위치를 나타냅니다.
+            unsqueeze는 차원을 추가하는 함수입니다.
+            long()는 데이터 타입을 long으로 바꿔주는 함수입니다.
+            to()는 데이터 타입을 바꿔주는 함수입니다.
+            
+            """
             person_idx = torch.Tensor([0]).unsqueeze(0).long().to(device)  # TODO adapt this depending on the loaded model
             full_face_image = transform(image=img_warped_face)["image"].unsqueeze(0).float().to(device)
             left_eye_image = transform(image=img_warped_left_eye)["image"].unsqueeze(0).float().to(device)
             right_eye_image = transform(image=img_warped_right_eye)["image"].unsqueeze(0).float().to(device)
 
             # prediction
+            """
+            output은 모델의 출력값입니다.
+            gaze_vector_3d_normalized는 3차원으로 변환된 눈의 방향을 의미합니다.
+            dot은 내적을 의미합니다.
+            linalg.norm는 벡터의 크기를 의미합니다.
+            gaze_vector는 눈의 방향을 의미합니다.
+            gaze_vector_buffer는 눈의 방향을 저장하는 버퍼입니다.
+            asarry는 numpy 배열로 변환하는 함수입니다.
+            mean은 평균을 의미합니다.
+            result는 최종적으로 출력되는 눈의 방향입니다.
+            ray_plane_intersection는 광선과 평면의 교점을 구하는 함수입니다.
+            reshape는 차원을 바꾸는 함수입니다.
+            get_point_on_screen는 화면상의 좌표를 구하는 함수입니다.
+            point_on_screen는 화면상의 좌표를 의미합니다.
+            """
             output = model(person_idx, full_face_image, right_eye_image, left_eye_image).squeeze(0).detach().cpu().numpy()
             gaze_vector_3d_normalized = gaze_2d_to_3d(output)
             gaze_vector = np.dot(np.linalg.inv(rotation_matrix), gaze_vector_3d_normalized)
@@ -592,17 +680,31 @@ def main(calibration_matrix_path: str, monitor_mm=None, monitor_pixels=None, mod
             # gaze vector to screen
             result = ray_plane_intersection(face_center.reshape(3), gaze_vector, plane_w, plane_b)
             point_on_screen = get_point_on_screen(monitor_mm, monitor_pixels, result)
-
+            """
+            만약 visualize_laser_pointer이 True이면 레이저포인터를 보여줍니다.
+            ones는 1로 채워진 배열을 만드는 함수입니다.
+            gaze_points는 레이저포인터의 위치를 의미합니다.
+            appendleft는 리스트의 맨 앞에 원소를 추가하는 함수입니다. 
+            """
+            
             if visualize_laser_pointer:
                 display = np.ones((monitor_pixels[1], monitor_pixels[0], 3), np.float32)
 
                 gaze_points.appendleft(point_on_screen)
 
-                for idx in range(1, len(gaze_points)):
-                    thickness = round((len(gaze_points) - idx) / len(gaze_points) * 5) + 1
-                    cv2.line(display, gaze_points[idx - 1], gaze_points[idx], (0, 0, 255), thickness)
-                if frame_idx % 2 == 0:
-                    cv2.imshow(WINDOW_NAME, display)
+                for idx in range(1, len(gaze_points)): #gaze_points의 길이만큼 반복
+                    thickness = round((len(gaze_points) - idx) / len(gaze_points) * 5) + 1 #thickness는 레이저포인터의 굵기를 의미합니다. 
+                    #오래된 레이저포인터일수록 굵기가 작아집니다.
+                    cv2.line(display, gaze_points[idx - 1], gaze_points[idx], (0, 0, 255), thickness)#레이저포인터를 그립니다.
+                    #레이저포인터의 색은 빨간색입니다.
+                    # gaze_points를 저장합니다
+                    # file = open("gaze_points.txt", "w")
+                    # file.write(str(gaze_points))
+                    print(gaze_points)
+                     
+                    
+                if frame_idx % 2 == 0: # frame_idx가 2로 나누어 떨어지면
+                    cv2.imshow(WINDOW_NAME, display)#레이저포인터를 보여줍니다.
 
             if visualize_3d:
                 plot_3d_scene.plot_face_landmarks(face_model_all_transformed)
