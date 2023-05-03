@@ -13,10 +13,10 @@ from model import Model
 from mpii_face_gaze_preprocessing import normalize_single_image
 from utils import get_camera_matrix, get_face_landmarks_in_ccs, gaze_2d_to_3d, ray_plane_intersection, plane_equation, get_monitor_dimensions, get_point_on_screen
 from visualization import Plot3DScene
-from webcam import WebcamSource
+from webcam import WebcamSource 
 
 # face model from https://github.com/google/mediapipe/blob/master/mediapipe/modules/face_geometry/data/canonical_face_model.obj
-face_model_all: np.ndarray = np.array([
+face_model_all: np.ndarray = np.array([ 
     [0.000000, -3.406404, 5.979507],
     [0.000000, -1.126865, 7.475604],
     [0.000000, -2.089024, 6.058267],
