@@ -9,35 +9,17 @@ from webcam import WebcamSource
 
 
 def record_video(width: int, height: int, fps: int) -> None:
-    """
-    Create a mp4 video file with `width`x`height` and `fps` frames per second.
-    Shows a preview of the recording every 5 frames.
-
-    :param width: width of the video
-    :param height: height of the video
-    :param fps: frames per second
-    :return: None
-    """
-
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     source = WebcamSource(width=width, height=height, fps=fps, buffer_size=10)
-    video_writer = cv2.VideoWriter(f'{datetime.now().strftime("%Y-%m-%d_%H:%M:%S")}.mp4', cv2.VideoWriter_fourcc(*'MP4V'), fps, (width, height))
+    video_writer = cv2.VideoWriter(f'output.mp4',fourcc,fps,(width, height))
     for idx, frame in enumerate(source):
-        video_writer.write(frame)
+        video_writer.write(frame)        
+        #frame에 q를 누르면 종료를 추가한다
+        cv2.putText(frame, "Press q to quit", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
         source.show(frame, only_print=idx % 5 != 0)
 
 
 def calibration(image_path, every_nth: int = 1, debug: bool = False, chessboard_grid_size=(7, 7)):
-    """
-    Perform camera calibration on the previously collected images.
-    Creates `calibration_matrix.yaml` with the camera intrinsic matrix and the distortion coefficients.
-
-    :param image_path: path to all png images
-    :param every_nth: only use every n_th image
-    :param debug: preview the matched chess patterns
-    :param chessboard_grid_size: size of chess pattern
-    :return:
-    """
-
     x, y = chessboard_grid_size
 
     # termination criteria
@@ -92,7 +74,7 @@ def calibration(image_path, every_nth: int = 1, debug: bool = False, chessboard_
     }
 
     # and save it to a file
-    with open("calibration_matrix.yaml", "w") as f:
+    with open("./calibration_matrix.yaml", "w") as f:
         yaml.dump(data, f)
 
     print(data)

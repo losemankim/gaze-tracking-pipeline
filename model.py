@@ -4,7 +4,7 @@ from torch import nn
 from torchvision import models
 
 
-class SELayer(nn.Module):
+class SELayer(nn.Module):#SELayer는 Squeeze and Excitation Layer의 약자로, 채널간의 상호작용을 강화시키는 역할을 한다.
     """
     Squeeze-and-Excitation layer
 
@@ -36,10 +36,10 @@ class Model(LightningModule):
     def __init__(self, *args, **kwargs):
         super().__init__()
 
-        self.subject_biases = nn.Parameter(torch.zeros(15 * 2, 2))  # pitch and yaw offset for the original and mirrored participant
+        self.subject_biases = nn.Parameter(torch.zeros(15 * 2, 2))  # pitch and yaw offset for the original and mirrored participant #한글:원본과 미러링된 참가자에 대한 피치 및 요 오프셋
 
         self.cnn_face = nn.Sequential(
-            models.vgg16(pretrained=True).features[:9],  # first four convolutional layers of VGG16 pretrained on ImageNet
+            models.vgg16(pretrained=True).features[:9],  # first four convolutional layers of VGG16 pretrained on ImageNet#한글:VGG16의 첫 4개의 합성곱 계층은 ImageNet에서 사전 훈련되었습니다.
             nn.Conv2d(128, 64, kernel_size=(1, 1), stride=(1, 1), padding='same'),
             nn.ReLU(inplace=True),
             nn.BatchNorm2d(64),

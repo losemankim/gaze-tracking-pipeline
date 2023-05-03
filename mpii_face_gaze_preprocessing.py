@@ -6,50 +6,50 @@ import numpy as np
 
 def get_matrices(camera_matrix: np.ndarray, distance_norm: int, center_point: np.ndarray, focal_norm: int, head_rotation_matrix: np.ndarray, image_output_size: Tuple[int, int]) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
-    Calculate rotation, scaling and transformation matrix.
+    회전, 스케일링 및 변환 매트릭스를 계산합니다.
 
-    :param camera_matrix: intrinsic camera matrix
-    :param distance_norm: normalized distance of the camera
-    :param center_point: position of the center in the image
-    :param focal_norm: normalized focal length
-    :param head_rotation_matrix: rotation of the head
-    :param image_output_size: output size of the output image
-    :return: rotation, scaling and transformation matrix
+    :param camera_matrix: 고유 카메라 매트릭스
+    :param distance_norm: 카메라의 정규화된 거리
+    :param center_point: 이미지의 중심 위치
+    :param focal_norm: 정규화된 초점 거리
+    :param head_rotation_matrix: 머리 회전
+    :param image_output_size: 출력 이미지의 출력 크기
+    :return: 회전, 스케일링 및 변환 매트릭스
     """
     # normalize image
     distance = np.linalg.norm(center_point)  # actual distance between center point and original camera
     z_scale = distance_norm / distance
-
+    #cam_norm: 정규화된 카메라 매트릭스
     cam_norm = np.array([
         [focal_norm, 0, image_output_size[0] / 2],
         [0, focal_norm, image_output_size[1] / 2],
         [0, 0, 1.0],
     ])
-
+    # scaling matrix:z축만 z-scale이 적용됩니다.
     scaling_matrix = np.array([
         [1.0, 0.0, 0.0],
         [0.0, 1.0, 0.0],
         [0.0, 0.0, z_scale],
     ])
 
-    forward = (center_point / distance).reshape(3)
-    down = np.cross(forward, head_rotation_matrix[:, 0])
-    down /= np.linalg.norm(down)
-    right = np.cross(down, forward)
-    right /= np.linalg.norm(right)
+    forward = (center_point / distance).reshape(3) # 눈의 방향
+    down = np.cross(forward, head_rotation_matrix[:, 0])# 눈의 아래 방향
+    down /= np.linalg.norm(down)# 눈의 아래 방향의 크기를 1로 만듭니다.
+    right = np.cross(down, forward)# 눈의 오른쪽 방향
+    right /= np.linalg.norm(right)# 눈의 오른쪽 방향의 크기를 1로 만듭니다.
 
-    rotation_matrix = np.asarray([right, down, forward])
-    transformation_matrix = np.dot(np.dot(cam_norm, scaling_matrix), np.dot(rotation_matrix, np.linalg.inv(camera_matrix)))
+    rotation_matrix = np.asarray([right, down, forward])# 회전 매트릭스
+    transformation_matrix = np.dot(np.dot(cam_norm, scaling_matrix), np.dot(rotation_matrix, np.linalg.inv(camera_matrix)))# 변환 매트릭스
 
     return rotation_matrix, scaling_matrix, transformation_matrix
 
 
 def equalize_hist_rgb(rgb_img: np.ndarray) -> np.ndarray:
     """
-    Equalize the histogram of a RGB image.
+    RGB 이미지의 히스토그램을 균일화합니다.
 
-    :param rgb_img: RGB image
-    :return: equalized RGB image
+    :param rgb_img: RGB 이미지
+    :return: 균등화된 RGB 이미지
     """
     ycrcb_img = cv2.cvtColor(rgb_img, cv2.COLOR_RGB2YCrCb)  # convert from RGB color-space to YCrCb
     ycrcb_img[:, :, 0] = cv2.equalizeHist(ycrcb_img[:, :, 0])  # equalize the histogram of the Y channel
@@ -59,20 +59,19 @@ def equalize_hist_rgb(rgb_img: np.ndarray) -> np.ndarray:
 
 def normalize_single_image(image: np.ndarray, head_rotation, gaze_target: np.ndarray, center_point: np.ndarray, camera_matrix: np.ndarray, is_eye: bool = True) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
-    The normalization process of a single image, creates a normalized eye image or a face image, depending on `is_eye`.
-
-    :param image: original image
-    :param head_rotation: rotation of the head
-    :param gaze_target: 3D target of the gaze
-    :param center_point: 3D point on the face to focus on
-    :param camera_matrix: intrinsic camera matrix
-    :param is_eye: if true the `distance_norm` and `image_output_size` values for the eye are used
-    :return: normalized image, normalized gaze and rotation matrix
+    단일 이미지의 정규화 과정은 'is_eye'에 따라 정규화된 눈 이미지 또는 얼굴 이미지를 생성합니다.
+    :param 이미지: 원본 이미지
+    :param head_rotation: 머리의 회전
+    :param gaze_target: 시선의 3D 대상
+    :param center_point: 초점을 맞출 얼굴의 3D 점
+    :param camera_matrix: 고유 카메라 매트릭스
+    :param is_eye: 참이면 눈에 대한 `distance_norm` 및 `image_output_size` 값이 사용됩니다.
+    :return: 정규화된 이미지, 정규화된 시선 및 회전 행렬
     """
     # normalized camera parameters
-    focal_norm = 960  # focal length of normalized camera
-    distance_norm = 500 if is_eye else 1600  # normalized distance between eye and camera
-    image_output_size = (96, 64) if is_eye else (96, 96)  # size of cropped eye image
+    focal_norm = 960  # focal length of normalized camera #정규화된 카메라의 초점 거리
+    distance_norm = 500 if is_eye else 1600  # normalized distance between eye and camera #카메라와 눈 사이의 정규화된 거리
+    image_output_size = (96, 64) if is_eye else (96, 96)  # size of cropped eye image #크롭된 눈 이미지의 크기
 
     # compute estimated 3D positions of the landmarks
     if gaze_target is not None:

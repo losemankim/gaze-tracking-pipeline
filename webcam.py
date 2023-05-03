@@ -12,6 +12,7 @@ class WebcamSource:
 
     def __init__(self, camera_id=0, width=1280, height=720, fps=30, buffer_size=1):
         self.__name = "WebcamSource"
+        self.__capture = None  # __capture를 미리 None으로 초기화
         self.__capture = cv2.VideoCapture(camera_id)
         self.__capture.set(cv2.CAP_PROP_FRAME_WIDTH, width)
         self.__capture.set(cv2.CAP_PROP_FRAME_HEIGHT, height)

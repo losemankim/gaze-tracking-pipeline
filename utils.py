@@ -4,7 +4,8 @@ from typing import Tuple, Union
 import cv2
 import numpy as np
 import yaml
-
+import math
+import time
 
 def get_monitor_dimensions() -> Union[Tuple[Tuple[int, int], Tuple[int, int]], Tuple[None, None]]:
     """
@@ -103,7 +104,7 @@ def gaze_2d_to_3d(gaze: np.ndarray) -> np.ndarray:
     :param gaze: 피치 및 시선 벡터
     :return: 3d 벡터
     """
-    x = -np.cos(gaze[0]) * np.sin(gaze[1])
+    x = -np.cos(gaze[0]) * np.sin(gaze[1]) 
     y = -np.sin(gaze[0])
     z = -np.cos(gaze[0]) * np.cos(gaze[1])
     return np.array([x, y, z])
@@ -120,21 +121,23 @@ def ray_plane_intersection(support_vector: np.ndarray, direction_vector: np.ndar
     :param plane_d: 평면의 d
     :return: 사람이 화면에서 보고 있는 3D 지점
     """
-    a11 = direction_vector[1]
-    a12 = -direction_vector[0]
-    b1 = direction_vector[1] * support_vector[0] - direction_vector[0] * support_vector[1]
-
-    a22 = direction_vector[2]
+    # direction_vector는 방향벡터입니다. 방향벡터는 광선의 방향을 나타냅니다. 이것의 정확도를 높이기 위해서는 광선의 방향을 나타내는 벡터를 더 정확하게 계산해야 합니다.
+    
+    a11 = direction_vector[1]  #a11은 방향벡터의 y좌표입니다.
+    a12 = -direction_vector[0] #a12는 방향벡터의 x좌표입니다.
+    b1 = direction_vector[1] * support_vector[0] - direction_vector[0] * support_vector[1] #b1은 방향벡터의 y좌표와 지원벡터의 x좌표의 곱에서 방향벡터의 x좌표와 지원벡터의 y좌표의 곱을 뺀 값입니다. 이것은 
+    #support_vector와 direction_vector가 평행하지 않다는 가정하에 광선의 방향을 나타내는 벡터를 더 정확하게 계산할 수 있습니다.
+    a22 = direction_vector[2] #a22
     a23 = -direction_vector[1]
     b2 = direction_vector[2] * support_vector[1] - direction_vector[1] * support_vector[2]
 
     line_w = np.array([[a11, a12, 0], [0, a22, a23]])
     line_b = np.array([[b1], [b2]])
 
-    matrix = np.insert(line_w, 2, plane_normal, axis=0)
-    bias = np.insert(line_b, 2, plane_d, axis=0)
+    matrix = np.insert(line_w, 2, plane_normal, axis=0)#matrix는 행렬입니다. 행렬은 행렬의 해를 구하는데 있어서 중요한 역할을 합니다.
+    bias = np.insert(line_b, 2, plane_d, axis=0) #bias는 편향입니다. 편향은 행렬의 해를 구하는데 있어서 중요한 역할을 합니다.
 
-    return np.linalg.solve(matrix, bias).reshape(3)
+    return np.linalg.solve(matrix, bias).reshape(3) #linalg.solve는 행렬의 해를 구하는 함수입니다.#reshape는 행렬의 크기를 바꾸는 함수입니다.
 
 
 def plane_equation(rmat: np.ndarray, tmat: np.ndarray) -> np.ndarray:
@@ -179,13 +182,61 @@ def get_point_on_screen(monitor_mm: Tuple[float, float], monitor_pixels: Tuple[f
     asarray()는 데이터를 배열로 바꿉니다.
     tuple()은 데이터를 튜플로 바꿉니다.
     """
+    # print(result[0])
+    # print(result[1])
     result_x = result[0]
-    result_x = -result_x + monitor_mm[0] / 2   
+    result_x = -result_x + monitor_mm[0] /2
     result_x = result_x * (monitor_pixels[0] / monitor_mm[0])#
-
+    
     result_y = result[1]
-    result_y = result_y - 20  # 20 mm offset
+    result_y = result_y   # 20 mm offset
     result_y = min(result_y, monitor_mm[1])
     result_y = result_y * (monitor_pixels[1] / monitor_mm[1])
     
     return tuple(np.asarray([result_x, result_y]).round().astype(int))
+
+def euclaideanDistance(point, point1):
+    x, y = point
+    x1, y1 = point1
+    distance = math.sqrt((x1 - x)**2 + (y1 - y)**2)
+    return distance
+def blinkRatio(landmarks, right_indices):
+    rh_right = landmarks[right_indices[0]]#눈썹의 오른쪽 끝
+    rh_left = landmarks[right_indices[8]]#눈썹의 왼쪽 끝
+    rv_top = landmarks[right_indices[12]]#눈썹의 위쪽 끝
+    rv_bottom = landmarks[right_indices[4]]#눈썹의 아래쪽 끝
+    rhDistance = euclaideanDistance(rh_right, rh_left)#눈썹의 오른쪽 끝과 왼쪽 끝의 거리
+    rvDistance = euclaideanDistance(rv_top, rv_bottom)#눈썹의 위쪽 끝과 아래쪽 끝의 거리
+    reRatio = rhDistance/rvDistance#눈썹의 오른쪽 끝과 왼쪽 끝의 거리와 눈썹의 위쪽 끝과 아래쪽 끝의 거리의 비율
+    ratio = reRatio#ratio는 눈썹의 오른쪽 끝과 왼쪽 끝의 거리와 눈썹의 위쪽 끝과 아래쪽 끝의 거리의 비율입니다.
+    return ratio 
+def landmarksDetection(img, results): #얼굴의 랜드마크를 찾는 함수
+    img_height, img_width= img.shape[:2]
+    mesh_coord = [(int(point.x * img_width), int(point.y * img_height)) for point in results.multi_face_landmarks[0].landmark]
+    return mesh_coord
+
+def blinkRatio2(face_model_all_transformed, LEFT_EYE):
+    # 1. 좌표 중에서 가장 왼쪽 포인트와 가장 오른쪽 포인트를 찾는다.
+    left_eye_coords = face_model_all_transformed[LEFT_EYE, :]
+    leftmost_point = np.argmin(left_eye_coords[:, 0])
+    rightmost_point = np.argmax(left_eye_coords[:, 0])
+    
+    # 2. 눈의 가로 길이를 계산한다.
+    eye_width = np.abs(left_eye_coords[rightmost_point, 0] - left_eye_coords[leftmost_point, 0])
+    
+    # 3. 눈을 감았는지 여부를 판단한다.
+    top_point = np.argmin(left_eye_coords[:, 1])
+    bottom_point = np.argmax(left_eye_coords[:, 1])
+    eye_height = np.abs(left_eye_coords[top_point, 1] - left_eye_coords[bottom_point, 1])
+    ratio = eye_height / eye_width
+def split_screen(pixel,split_num):
+    pixel_x = pixel[0]
+    width=[] 
+    for i in range(1,split_num+1):
+        width.append(pixel_x/split_num*i)
+
+    return width
+def compare_pw(pw1,pw2):
+    #리스트 형식으로 받아온 비밀번호를 비교하는 함수
+    if pw1==pw2:
+        return True
