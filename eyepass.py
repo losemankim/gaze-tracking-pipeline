@@ -11,7 +11,8 @@ import usersingup as signup
 import cali as cali
 #hash화를 위한 모듈
 import hashlib
-
+#모니터해상도
+from win32api import GetSystemMetrics
 
 main_class = uic.loadUiType("./main.ui")[0]
 cali_class = uic.loadUiType("./cali.ui")[0]
@@ -33,6 +34,7 @@ class mainwidget(QWidget,main_class):
         self.Moniter_mm_InputTextbox.textChanged.connect(self.handle_monitor_info)        
         self.Moniter_dpi_label
         self.Moniter_dpi_InputTextbox.setPlaceholderText("모니터의 해상도를 입력해주세요.(ex: 1920, 1080)")
+        self.Moniter_dpi_InputTextbox.setText(str(GetSystemMetrics(0))+","+str(GetSystemMetrics(1)))
         self.Moniter_dpi_InputTextbox.textChanged.connect(self.handle_monitor_info)
         self.Start_cert_btn.clicked.connect(self.start_cert)
         self.Userlist_box.itemClicked.connect(self.handle_select_user)
