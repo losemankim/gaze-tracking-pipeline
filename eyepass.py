@@ -9,12 +9,13 @@ import subprocess
 import play as main
 import usersingup as signup
 import cali as cali
+#hash화를 위한 모듈
+import hashlib
 
 
 main_class = uic.loadUiType("./main.ui")[0]
 cali_class = uic.loadUiType("./cali.ui")[0]
 signup_class = uic.loadUiType("./usersignup.ui")[0]
-
 
 """
 setupUi(self)를 이용해 UI를 설정해준다. 이 함수는 UI파일을 로드하고, UI파일에 있는 위젯들을 인스턴스화 해준다.
@@ -60,10 +61,23 @@ class mainwidget(QWidget,main_class):
             try :
                 self.username=self.username.text().replace('\n','')
                 f=open('./user/'+self.username+'.txt','r')
+                PW=f.read()
+                text=main.pw_make(calibration_matrix_path="./calibration_matrix.yaml",model_path="../p03.ckpt",monitor_mm=(243,137),monitor_pixels=(1920,1080),visualize_laser_pointer=True,password=None)
+                hash=hashlib.sha256()
+                hash.update(text.encode('utf-8'))
+                text=hash.hexdigest()
+                if(PW==text):
+                    QMessageBox.about(self, "성공", "인증에 성공하였습니다.")
             except FileNotFoundError:
                 print("파일이 존재하지 않습니다.")
                 QMessageBox.about(self, "경고", "파일이 존재하지 않습니다\n 비밀번호를 설정합니다.")
-                # text=main.pw_make(calibration_matrix_path="./calibration_matrix.yaml",model_path="../p03.ckpt",monitor_mm=(243,137),monitor_pixels=(1920,1080),visualize_laser_pointer=True,password=None)
+                text=main.pw_make(calibration_matrix_path="./calibration_matrix.yaml",model_path="../p03.ckpt",monitor_mm=(243,137),monitor_pixels=(1920,1080),visualize_laser_pointer=True,password=None)
+                
+                #hash화
+                hash=hashlib.sha256()
+                hash.update(text.encode('utf-8'))
+                text=hash.hexdigest()
+                
                 f=open('./user/'+self.username+'.txt','w')
                 f.write('test')
                 # f.write(self.username.text()+'\n'+text+'\n'+str(self.user_info['email']),'\n'+str(self.user_info['phone']))
