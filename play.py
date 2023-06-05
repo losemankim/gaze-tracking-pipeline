@@ -506,9 +506,9 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 async def cooltime():
     await asyncio.sleep(1)
     return 1
-def main(calibration_matrix_path: str, monitor_mm, monitor_pixels=None, model=None, visualize_preprocessing=False, visualize_laser_pointer=True, visualize_3d=False,password=None):
+def main(calibration_matrix_path: str, monitor_mm, monitor_pixels=None, model=None, visualize_preprocessing=False, visualize_laser_pointer=True, visualize_3d=False,make_pw=False):
     source = WebcamSource(width=1280, height=720, fps=60, buffer_size=10)
-    text ="space bar for save num"
+    text ="press space bar for save num       press a to return num     press esc to exit"
     split_num=4
     input_num=[]
     can_input_num=1
@@ -560,6 +560,7 @@ def main(calibration_matrix_path: str, monitor_mm, monitor_pixels=None, model=No
             rvec = np.asarray(rvec_buffer).mean(axis=0)
             tvec_buffer.append(tvec)
             tvec = np.asarray(tvec_buffer).mean(axis=0)
+            
             face_model_transformed, face_model_all_transformed = get_face_landmarks_in_ccs(camera_matrix, dist_coefficients, frame.shape, results, face_model, face_model_all, landmarks_ids)
             
             
@@ -619,30 +620,32 @@ def main(calibration_matrix_path: str, monitor_mm, monitor_pixels=None, model=No
                     cv2.line(display, (int(line[i-1]), 0), (int(line[i-1]), monitor_pixels[1]), (0, 0, 255), 2) #cv2.line은 선을 그리는 함수입니다.
                    
                     if i==1:
-                        # cv2.putText(display, str(i), (int(line[i-1]//2), int(monitor_mm[1]//2)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
                         cv2.circle(display, (int(line[i-1]//2), int(monitor_pixels[1]//2)), 5, (0, 0, 255), 5)
                     else:
-                        # cv2.putText(display, str(i), (int((line[i-1]+line[i-2])//2), int(monitor_mm[1]//2)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
                         cv2.circle(display, (int((line[i-1]+line[i-2])//2), int(monitor_pixels[1]//2)), 5, (0, 0, 255), 5)
                 rects = [(i*monitor_pixels[0]//split_num) for i in range(0,len(line)+1)]
                 cv2.putText(display, str(input_num), (monitor_pixels[1]//2, 900), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
-                cv2.putText(display, str(text), (10, 800),cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
+                if make_pw==False:
+                    cv2.putText(display, str(text), (10, 800),cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
                 for i in range(0,len(rects)):
                     if(i!=4):    
                         if rects[i]<=gaze_points[0][0]<=rects[i+1]:
                             cv2.putText(display, str(i+1), (300, 300), cv2.FONT_HERSHEY_SIMPLEX, 10, (0, 0, 255), 2)
-                            if cv2.waitKey(30) & 0xFF == 32: #32는 스페이스바를 의미합니다.
+                            if cv2.waitKey(10) & 0xFF == 32: #32는 스페이스바를 의미합니다.
                                 input_num.append(i+1)
-                                #이곳에 input_num과 저장된 비밀번호를 비교하는 코드를 작성합니다.
-                                print(input_num)
-                                print(password)
-                                #비밀번호가 일치하는지 확인하는 코드입니다.
-                            if cv2.waitKey(30) & 0xFF == 27:#27은 esc를 의미합니다.
+                            if cv2.waitKey(10) & 0xFF ==ord('a'):
+                                #왜 q를 누르면 초기화가 되는지 모르겠습니다. 
+                                print("리턴직전:"+str(input_num))
+                                return input_num
+                            if cv2.waitKey(10) & 0xFF == 27:#27은 esc를 의미합니다.
                                 input_num=[]
                                 print("초기화")
+                                
                         else:
-                            cv2.putText(display, "out of screen", (300, 500), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 0, 255), 2)
-                cv2.circle(display, gaze_points[0], 5, (255, 0, 0), 2)
+                            if make_pw==False:
+                                    cv2.putText(display, "out of screen", (300, 500), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 0, 255), 2)
+                if make_pw==False:
+                    cv2.circle(display, gaze_points[0], 5, (255, 0, 0), 2)#
                 cv2.imshow(WINDOW_NAME, display)#레이저포인터를 보여줍니다.
             if visualize_3d:
                 plot_3d_scene.plot_face_landmarks(face_model_all_transformed)
@@ -652,19 +655,12 @@ def main(calibration_matrix_path: str, monitor_mm, monitor_pixels=None, model=No
         new_frame_time = time.time()
         fps_deque.append(1 / (new_frame_time - prev_frame_time))
         prev_frame_time = new_frame_time
-        if frame_idx % 60 == 0:
-            print(f'FPS: {np.mean(fps_deque):5.2f}')
-        if compare_pw(input_num,password):
-            print("correct.")
-            text="correct_password"
-            return text
-        else:
-            print("실패")
-def pw_make(calibration_matrix_path, model_path, monitor_mm, monitor_pixels,password,visualize_preprocessing=False, visualize_laser_pointer=False, visualize_3d=False):
+
+def pw_make(calibration_matrix_path, model_path, monitor_mm, monitor_pixels,visualize_preprocessing=False, visualize_laser_pointer=False, visualize_3d=False,make_pw=False):
     model_path='./p13.ckpt'
     model = Model.load_from_checkpoint(model_path).to(device) #모델을 불러옵니다.
     model.eval() #모델을 평가모드로 설정합니다.
-    text=main(calibration_matrix_path,monitor_mm,monitor_pixels, model, visualize_preprocessing, visualize_laser_pointer, visualize_3d,password)
+    text=main(calibration_matrix_path,monitor_mm,monitor_pixels, model, visualize_preprocessing, visualize_laser_pointer, visualize_3d,make_pw)
     return text
 
 

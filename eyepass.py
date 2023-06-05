@@ -1,7 +1,6 @@
 ﻿import sys
 import os
-import typing
-from PyQt5 import QtCore, uic
+from PyQt5 import QtCore, uic,QtGui
 from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget,QMessageBox
 import camera_calibration as camera
 #ffmpeg를 이용해 파일을 자르는 모듈
@@ -9,15 +8,29 @@ import subprocess
 import play as main
 import usersingup as signup
 import cali as cali
-#hash화를 위한 모듈
-import hashlib
 #모니터해상도
 from win32api import GetSystemMetrics
 
 main_class = uic.loadUiType("./main.ui")[0]
 cali_class = uic.loadUiType("./cali.ui")[0]
 signup_class = uic.loadUiType("./usersignup.ui")[0]
+service_class = uic.loadUiType("./service.ui")[0]
 
+
+class servicewidget(QWidget,service_class):
+    def __init__(self) :
+        super().__init__() 
+        self.setupUi(self) 
+        self.pic.setPixmap(QtGui.QPixmap("./cat.png"))
+        self.connect.clicked.connect(self.connect_btn_clicked)
+        self.exit.clicked.connect(self.close)
+    def connect_btn_clicked(self):
+        #index.html 실행
+        path=os.getcwd()
+        subprocess.call(['C:/Program Files (x86)/Google/Chrome/Application/chrome.exe', str(path)+'/index.html'])
+
+    def close(self):
+        sys.exit()
 """
 setupUi(self)를 이용해 UI를 설정해준다. 이 함수는 UI파일을 로드하고, UI파일에 있는 위젯들을 인스턴스화 해준다.
 """
@@ -46,6 +59,7 @@ class mainwidget(QWidget,main_class):
         self.username=None
         self.signup_window = signup.signupwidget(self.handle_userinfo)
         self.cali_window = cali.caliwidget(self.monitor_info)
+        self.service_window = servicewidget()
         for i in range(len(self.saved_user_list)):
             self.saved_user_list[i]=self.saved_user_list[i].replace('.txt','')
         self.Userlist_box.addItems(self.saved_user_list)
@@ -58,32 +72,27 @@ class mainwidget(QWidget,main_class):
             #경고창 띄우기
             QMessageBox.about(self, "경고", "사용자를 선택해주세요.")
         else:
-            print(self.username.text())
+            # print(self.username.text())
             #username.txt파일을 찾는다
             try :
                 self.username=self.username.text().replace('\n','')
                 f=open('./user/'+self.username+'.txt','r')
                 PW=f.read()
-                text=main.pw_make(calibration_matrix_path="./calibration_matrix.yaml",model_path="../p03.ckpt",monitor_mm=(243,137),monitor_pixels=(1920,1080),visualize_laser_pointer=True,password=None)
-                hash=hashlib.sha256()
-                hash.update(text.encode('utf-8'))
-                text=hash.hexdigest()
-                if(PW==text):
+                text=main.pw_make(calibration_matrix_path="./calibration_matrix.yaml",model_path="../p03.ckpt",monitor_mm=(243,137),monitor_pixels=(1920,1080),visualize_laser_pointer=True,make_pw=False)
+                print(str(PW)+" "+str(text))
+                if(str(PW)==str(text)):
                     QMessageBox.about(self, "성공", "인증에 성공하였습니다.")
+                    #서비스 실행
+                    self.service_window.show()
+                else:
+                    QMessageBox.about(self, "실패", "인증에 실패하였습니다.")
             except FileNotFoundError:
                 print("파일이 존재하지 않습니다.")
                 QMessageBox.about(self, "경고", "파일이 존재하지 않습니다\n 비밀번호를 설정합니다.")
-                text=main.pw_make(calibration_matrix_path="./calibration_matrix.yaml",model_path="../p03.ckpt",monitor_mm=(243,137),monitor_pixels=(1920,1080),visualize_laser_pointer=True,password=None)
-                
-                #hash화
-                hash=hashlib.sha256()
-                hash.update(text.encode('utf-8'))
-                text=hash.hexdigest()
-                
+                text=main.pw_make(calibration_matrix_path="./calibration_matrix.yaml",model_path="../p03.ckpt",monitor_mm=(243,137),monitor_pixels=(1920,1080),visualize_laser_pointer=True,make_pw=True)
                 f=open('./user/'+self.username+'.txt','w')
-                f.write('test')
-                # f.write(self.username.text()+'\n'+text+'\n'+str(self.user_info['email']),'\n'+str(self.user_info['phone']))
-                
+                f.write(text)
+
     def user_reg(self):
         self.signup_window.show()
     def Cam_Calibration_btn_clicked(self):
@@ -113,5 +122,3 @@ if __name__ == "__main__":
     myWindow.show()
     #앱실행
     app.exec_() 
-        
-    
